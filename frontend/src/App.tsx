@@ -4,9 +4,7 @@ import { StatsPanel } from './components/StatsPanel';
 import { AlertsPanel } from './components/AlertsPanel';
 import { Match, MatchStats, BetRecommendation } from './types';
 import { Activity, RefreshCw, Clock } from 'lucide-react';
-
-// Configuration API
-const API_BASE_URL = import.meta.env.PROD ? '' : 'http://localhost:8000';
+import { fetchLiveMatches, fetchMatchStats, analyzeMatch } from './services/api';
 
 interface MatchData {
   match: Match;
@@ -23,43 +21,34 @@ function App() {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Fonction pour récupérer les matchs
-  const fetchMatches = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     try {
       setIsRefreshing(true);
-      const response = await fetch(`${API_BASE_URL}/api/live-matches`);
-      const data = await response.json();
 
-      if (data.success && data.matches) {
+      // Récupérer les matchs en direct
+      const matches = await fetchLiveMatches();
+
+      if (matches.length > 0) {
         const newMatchesData = new Map<string, MatchData>();
 
         // Pour chaque match, récupérer les stats et l'analyse
-        for (const match of data.matches.slice(0, 10)) {
+        for (const match of matches.slice(0, 10)) {
           newMatchesData.set(match.id, { match });
 
-          // Récupérer stats et analyse en parallèle
           try {
-            const [statsRes, analysisRes] = await Promise.all([
-              fetch(`${API_BASE_URL}/api/match/${match.id}/stats`),
-              fetch(`${API_BASE_URL}/api/match/${match.id}/analysis?time_elapsed=60`)
-            ]);
+            // Récupérer les stats
+            const stats = await fetchMatchStats(match.id);
 
-            const statsData = await statsRes.json();
-            const analysisData = await analysisRes.json();
+            // Analyser avec TES
+            const timeElapsed = parseInt(String(match.time)) || 60;
+            const recommendations = analyzeMatch(stats, timeElapsed);
 
-            if (statsData.success) {
-              newMatchesData.set(match.id, {
-                ...newMatchesData.get(match.id)!,
-                stats: statsData.stats,
-              });
-            }
-
-            if (analysisData.success) {
-              newMatchesData.set(match.id, {
-                ...newMatchesData.get(match.id)!,
-                recommendations: analysisData.recommendations,
-                lastUpdate: analysisData.timestamp,
-              });
-            }
+            newMatchesData.set(match.id, {
+              match,
+              stats,
+              recommendations,
+              lastUpdate: new Date().toISOString(),
+            });
           } catch (err) {
             console.error(`Erreur stats/analysis pour match ${match.id}:`, err);
           }
@@ -68,8 +57,8 @@ function App() {
         setMatchesData(newMatchesData);
 
         // Sélectionner le premier match par défaut
-        if (data.matches.length > 0 && !selectedMatchId) {
-          setSelectedMatchId(data.matches[0].id);
+        if (matches.length > 0 && !selectedMatchId) {
+          setSelectedMatchId(matches[0].id);
         }
 
         setLastRefresh(new Date());
@@ -84,10 +73,10 @@ function App() {
 
   // Fetch initial et refresh automatique
   useEffect(() => {
-    fetchMatches();
+    fetchData();
 
     // Refresh toutes les 60 secondes
-    const interval = setInterval(fetchMatches, 60000);
+    const interval = setInterval(fetchData, 60000);
     return () => clearInterval(interval);
   }, []);
 
@@ -121,7 +110,7 @@ function App() {
             <div className="flex items-center gap-4">
               {/* Bouton refresh */}
               <button
-                onClick={fetchMatches}
+                onClick={fetchData}
                 disabled={isRefreshing}
                 className="flex items-center gap-2 px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors disabled:opacity-50"
               >
@@ -168,7 +157,7 @@ function App() {
               Les matchs apparaîtront ici dès qu'ils commenceront.
             </p>
             <button
-              onClick={fetchMatches}
+              onClick={fetchData}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             >
               Actualiser

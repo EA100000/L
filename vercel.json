@@ -3,16 +3,5 @@
   "buildCommand": "cd frontend && npm install && npm run build",
   "outputDirectory": "frontend/dist",
   "installCommand": "cd frontend && npm install",
-  "framework": "vite",
-  "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "/api/$1"
-    }
-  ],
-  "functions": {
-    "api/*.py": {
-      "runtime": "@vercel/python@4.1.0"
-    }
-  }
+  "framework": "vite"
 }
