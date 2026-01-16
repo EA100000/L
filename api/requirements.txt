@@ -1,0 +1,2 @@
+# Vercel Serverless Functions dependencies
+# No external dependencies needed - using stdlib only
