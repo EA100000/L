@@ -1,5 +1,5 @@
 import { Match, MatchStats, BetRecommendation } from '../types';
-import { Activity, AlertCircle, TrendingUp } from 'lucide-react';
+import { Activity, TrendingUp } from 'lucide-react';
 import { cn } from '../utils/cn';
 
 interface LiveMatchCardProps {

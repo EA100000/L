@@ -1,5 +1,4 @@
 import { MatchStats } from '../types';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 interface StatsPanelProps {
   stats: MatchStats;
