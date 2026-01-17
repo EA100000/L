@@ -4,10 +4,27 @@ import { Match, MatchStats, BetRecommendation } from '../types';
 // API-FOOTBALL - Données réelles
 // ==========================================
 
-// Clé API gratuite - 100 requêtes/jour
-// Créer une clé sur: https://www.api-football.com/
-// Configurer dans Vercel: Settings > Environment Variables > VITE_API_FOOTBALL_KEY
-const API_FOOTBALL_KEY = import.meta.env.VITE_API_FOOTBALL_KEY || '';
+// Clé API stockée dans localStorage
+const API_KEY_STORAGE = 'football_api_key';
+
+// Récupérer la clé depuis localStorage ou env
+export const getApiKey = (): string => {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem(API_KEY_STORAGE) || import.meta.env.VITE_API_FOOTBALL_KEY || '';
+  }
+  return import.meta.env.VITE_API_FOOTBALL_KEY || '';
+};
+
+// Sauvegarder la clé dans localStorage
+export const setApiKey = (key: string): void => {
+  if (typeof window !== 'undefined') {
+    if (key) {
+      localStorage.setItem(API_KEY_STORAGE, key);
+    } else {
+      localStorage.removeItem(API_KEY_STORAGE);
+    }
+  }
+};
 
 const API_FOOTBALL_HOST = 'v3.football.api-sports.io';
 
@@ -16,11 +33,12 @@ const API_FOOTBALL_HOST = 'v3.football.api-sports.io';
 // ==========================================
 
 const fetchFromAPIFootball = async (endpoint: string): Promise<any> => {
+  const apiKey = getApiKey();
   try {
     const response = await fetch(`https://${API_FOOTBALL_HOST}${endpoint}`, {
       method: 'GET',
       headers: {
-        'x-apisports-key': API_FOOTBALL_KEY,
+        'x-apisports-key': apiKey,
       },
     });
 
@@ -70,8 +88,10 @@ const SOFASCORE_API = 'https://api.sofascore.com/api/v1';
 // ==========================================
 
 export const fetchLiveMatches = async (): Promise<Match[]> => {
+  const apiKey = getApiKey();
+
   // Essayer API-Football d'abord (si clé configurée)
-  if (API_FOOTBALL_KEY) {
+  if (apiKey) {
     try {
       console.log('Fetching from API-Football...');
       const data = await fetchFromAPIFootball('/fixtures?live=all');

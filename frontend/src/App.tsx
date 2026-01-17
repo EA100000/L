@@ -3,8 +3,8 @@ import { LiveMatchCard } from './components/LiveMatchCard';
 import { StatsPanel } from './components/StatsPanel';
 import { AlertsPanel } from './components/AlertsPanel';
 import { Match, MatchStats, BetRecommendation } from './types';
-import { Activity, RefreshCw, Clock } from 'lucide-react';
-import { fetchLiveMatches, fetchMatchStats, analyzeMatch } from './services/api';
+import { Activity, RefreshCw, Clock, Key, Settings, X, Check } from 'lucide-react';
+import { fetchLiveMatches, fetchMatchStats, analyzeMatch, setApiKey, getApiKey } from './services/api';
 
 interface MatchData {
   match: Match;
@@ -19,6 +19,9 @@ function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [apiKeyInput, setApiKeyInput] = useState(getApiKey());
+  const [apiKeySaved, setApiKeySaved] = useState(false);
 
   // Fonction pour récupérer les matchs
   const fetchData = useCallback(async () => {
@@ -91,6 +94,17 @@ function App() {
     return count + highPriorityRecs.length;
   }, 0);
 
+  // Sauvegarder la clé API
+  const handleSaveApiKey = () => {
+    setApiKey(apiKeyInput);
+    setApiKeySaved(true);
+    setTimeout(() => setApiKeySaved(false), 2000);
+    // Recharger les données avec la nouvelle clé
+    fetchData();
+  };
+
+  const hasApiKey = !!getApiKey();
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       {/* Header */}
@@ -108,6 +122,21 @@ function App() {
             </div>
 
             <div className="flex items-center gap-4">
+              {/* Bouton Settings */}
+              <button
+                onClick={() => setShowSettings(!showSettings)}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors ${
+                  hasApiKey
+                    ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                    : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
+                }`}
+              >
+                <Key className="w-4 h-4" />
+                <span className="text-sm font-medium">
+                  {hasApiKey ? 'API OK' : 'Config API'}
+                </span>
+              </button>
+
               {/* Bouton refresh */}
               <button
                 onClick={fetchData}
@@ -137,6 +166,61 @@ function App() {
           </div>
         </div>
       </header>
+
+      {/* Settings Panel */}
+      {showSettings && (
+        <div className="bg-white border-b border-gray-200 shadow-sm">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div className="flex items-start gap-4">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-2">
+                  <Settings className="w-5 h-5 text-gray-600" />
+                  <h3 className="font-semibold text-gray-900">Configuration API-Football</h3>
+                </div>
+                <p className="text-sm text-gray-500 mb-3">
+                  Pour obtenir les vraies données des matchs, crée une clé gratuite sur{' '}
+                  <a
+                    href="https://www.api-football.com/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline"
+                  >
+                    api-football.com
+                  </a>
+                  {' '}(100 requêtes/jour gratuites)
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={apiKeyInput}
+                    onChange={(e) => setApiKeyInput(e.target.value)}
+                    placeholder="Colle ta clé API ici..."
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                  />
+                  <button
+                    onClick={handleSaveApiKey}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    {apiKeySaved ? <Check className="w-4 h-4" /> : <Key className="w-4 h-4" />}
+                    <span>{apiKeySaved ? 'Sauvegardé!' : 'Sauvegarder'}</span>
+                  </button>
+                </div>
+                {!hasApiKey && (
+                  <p className="text-xs text-orange-600 mt-2">
+                    Sans clé API, l'app utilise un proxy CORS (moins fiable)
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => setShowSettings(false)}
+                className="p-1 text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
