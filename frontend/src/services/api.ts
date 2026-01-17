@@ -93,29 +93,94 @@ export const fetchLiveMatches = async (): Promise<Match[]> => {
   // Essayer API-Football d'abord (si clé configurée)
   if (apiKey) {
     try {
-      console.log('Fetching from API-Football...');
-      const data = await fetchFromAPIFootball('/fixtures?live=all');
+      // D'abord essayer les matchs en direct
+      console.log('Fetching live matches from API-Football...');
+      const liveData = await fetchFromAPIFootball('/fixtures?live=all');
 
-      if (data?.response?.length > 0) {
-        console.log(`API-Football: ${data.response.length} live matches`);
+      if (liveData?.response?.length > 0) {
+        console.log(`API-Football: ${liveData.response.length} live matches`);
 
-        const matches: Match[] = data.response.slice(0, 25).map((fixture: any) => ({
+        const matches: Match[] = liveData.response.slice(0, 25).map((fixture: any) => ({
           id: `apifb_${fixture.fixture.id}`,
           homeTeam: fixture.teams.home.name,
           awayTeam: fixture.teams.away.name,
           score: `${fixture.goals.home ?? 0}-${fixture.goals.away ?? 0}`,
           time: `${fixture.fixture.status.elapsed || 0}'`,
-          status: fixture.fixture.status.short === 'LIVE' ||
-                  fixture.fixture.status.short === '1H' ||
-                  fixture.fixture.status.short === '2H' ||
-                  fixture.fixture.status.short === 'HT' ? 'live' : 'unknown',
+          status: 'live' as const,
           league: fixture.league.name
         }));
 
         return matches;
       }
+
+      // Si pas de matchs en direct, chercher les matchs du jour
+      console.log('No live matches, fetching today\'s fixtures...');
+      const today = new Date().toISOString().split('T')[0];
+      const todayData = await fetchFromAPIFootball(`/fixtures?date=${today}`);
+
+      if (todayData?.response?.length > 0) {
+        console.log(`API-Football: ${todayData.response.length} fixtures today`);
+
+        // Filtrer et trier: en cours > à venir > terminés
+        const fixtures = todayData.response;
+
+        // Séparer par statut
+        const live = fixtures.filter((f: any) =>
+          ['1H', '2H', 'HT', 'ET', 'P', 'LIVE'].includes(f.fixture.status.short)
+        );
+        const upcoming = fixtures.filter((f: any) =>
+          ['NS', 'TBD'].includes(f.fixture.status.short)
+        );
+        const finished = fixtures.filter((f: any) =>
+          ['FT', 'AET', 'PEN'].includes(f.fixture.status.short)
+        );
+
+        // Prendre les plus importants (top leagues)
+        const topLeagues = [39, 140, 135, 78, 61, 2, 3, 848, 1]; // PL, La Liga, Serie A, Bundesliga, L1, UCL, UEL, Conf League, World Cup
+
+        const sortByLeague = (a: any, b: any) => {
+          const aTop = topLeagues.indexOf(a.league.id);
+          const bTop = topLeagues.indexOf(b.league.id);
+          if (aTop !== -1 && bTop === -1) return -1;
+          if (aTop === -1 && bTop !== -1) return 1;
+          if (aTop !== -1 && bTop !== -1) return aTop - bTop;
+          return 0;
+        };
+
+        const sorted = [...live, ...upcoming.sort(sortByLeague), ...finished.sort(sortByLeague).reverse()];
+
+        const matches: Match[] = sorted.slice(0, 25).map((fixture: any) => {
+          const status = fixture.fixture.status.short;
+          let matchStatus: 'live' | 'scheduled' | 'finished' | 'unknown' = 'unknown';
+          let timeDisplay = '';
+
+          if (['1H', '2H', 'HT', 'ET', 'P', 'LIVE'].includes(status)) {
+            matchStatus = 'live';
+            timeDisplay = status === 'HT' ? 'MT' : `${fixture.fixture.status.elapsed || 0}'`;
+          } else if (['NS', 'TBD'].includes(status)) {
+            matchStatus = 'scheduled';
+            const kickoff = new Date(fixture.fixture.date);
+            timeDisplay = kickoff.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+          } else if (['FT', 'AET', 'PEN'].includes(status)) {
+            matchStatus = 'finished';
+            timeDisplay = 'Terminé';
+          }
+
+          return {
+            id: `apifb_${fixture.fixture.id}`,
+            homeTeam: fixture.teams.home.name,
+            awayTeam: fixture.teams.away.name,
+            score: `${fixture.goals.home ?? 0}-${fixture.goals.away ?? 0}`,
+            time: timeDisplay,
+            status: matchStatus,
+            league: fixture.league.name
+          };
+        });
+
+        return matches;
+      }
     } catch (error) {
-      console.log('API-Football failed, trying Sofascore...');
+      console.log('API-Football failed, trying Sofascore...', error);
     }
   } else {
     console.log('No API-Football key, using Sofascore...');

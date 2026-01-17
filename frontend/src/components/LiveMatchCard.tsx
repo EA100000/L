@@ -40,19 +40,50 @@ export const LiveMatchCard = ({ match, stats, recommendations = [] }: LiveMatchC
     (r) => r.confidence === 'VERY_HIGH' || r.confidence === 'HIGH'
   );
 
-  return (
-    <div className="bg-white rounded-lg shadow-md border border-gray-200 p-4 hover:shadow-lg transition-shadow">
-      {/* Header avec statut LIVE */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
+  const getStatusDisplay = () => {
+    switch (match.status) {
+      case 'live':
+        return (
           <div className="flex items-center gap-1">
             <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
             <span className="text-xs font-semibold text-red-600 uppercase">LIVE</span>
+            <span className="text-xs text-gray-500">{match.time}</span>
           </div>
-          <span className="text-xs text-gray-500">{match.time}'</span>
-        </div>
+        );
+      case 'scheduled':
+        return (
+          <div className="flex items-center gap-1">
+            <div className="w-2 h-2 bg-blue-500 rounded-full" />
+            <span className="text-xs font-semibold text-blue-600">{match.time}</span>
+          </div>
+        );
+      case 'finished':
+        return (
+          <div className="flex items-center gap-1">
+            <div className="w-2 h-2 bg-gray-400 rounded-full" />
+            <span className="text-xs font-semibold text-gray-500">Terminé</span>
+          </div>
+        );
+      default:
+        return (
+          <div className="flex items-center gap-1">
+            <span className="text-xs text-gray-500">{match.time}</span>
+          </div>
+        );
+    }
+  };
+
+  return (
+    <div className={cn(
+      "bg-white rounded-lg shadow-md border p-4 hover:shadow-lg transition-shadow",
+      match.status === 'live' ? 'border-red-200' :
+      match.status === 'scheduled' ? 'border-blue-200' : 'border-gray-200'
+    )}>
+      {/* Header avec statut */}
+      <div className="flex items-center justify-between mb-3">
+        {getStatusDisplay()}
         {match.league && (
-          <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+          <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded truncate max-w-[120px]">
             {match.league}
           </span>
         )}

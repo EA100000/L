@@ -253,8 +253,8 @@ function App() {
             <div className="lg:col-span-1 space-y-4">
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
                 <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                  <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                  Matchs en direct ({matchesArray.length})
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                  Matchs du jour ({matchesArray.length})
                 </h2>
                 <div className="space-y-3 max-h-[600px] overflow-y-auto">
                   {matchesArray.map((matchData) => (
