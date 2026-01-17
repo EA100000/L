@@ -3,8 +3,8 @@ export interface Match {
   homeTeam: string;
   awayTeam: string;
   score: string;
-  time: number;
-  status: 'live' | 'finished' | 'scheduled';
+  time: string | number;
+  status: 'live' | 'finished' | 'scheduled' | 'unknown';
   league?: string;
 }
 
