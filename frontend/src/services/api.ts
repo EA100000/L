@@ -1,12 +1,13 @@
 import { Match, MatchStats, BetRecommendation } from '../types';
 
 // ==========================================
-// API-FOOTBALL (RapidAPI) - Données réelles
+// API-FOOTBALL - Données réelles
 // ==========================================
 
 // Clé API gratuite - 100 requêtes/jour
-// Tu peux créer ta propre clé sur: https://www.api-football.com/
-const API_FOOTBALL_KEY = '3e8fe52a8c72c4f2a5a8d1b9e4567890'; // Clé de demo
+// Créer une clé sur: https://www.api-football.com/
+// Configurer dans Vercel: Settings > Environment Variables > VITE_API_FOOTBALL_KEY
+const API_FOOTBALL_KEY = import.meta.env.VITE_API_FOOTBALL_KEY || '';
 
 const API_FOOTBALL_HOST = 'v3.football.api-sports.io';
 
@@ -69,31 +70,35 @@ const SOFASCORE_API = 'https://api.sofascore.com/api/v1';
 // ==========================================
 
 export const fetchLiveMatches = async (): Promise<Match[]> => {
-  // Essayer API-Football d'abord
-  try {
-    console.log('Fetching from API-Football...');
-    const data = await fetchFromAPIFootball('/fixtures?live=all');
+  // Essayer API-Football d'abord (si clé configurée)
+  if (API_FOOTBALL_KEY) {
+    try {
+      console.log('Fetching from API-Football...');
+      const data = await fetchFromAPIFootball('/fixtures?live=all');
 
-    if (data?.response?.length > 0) {
-      console.log(`API-Football: ${data.response.length} live matches`);
+      if (data?.response?.length > 0) {
+        console.log(`API-Football: ${data.response.length} live matches`);
 
-      const matches: Match[] = data.response.slice(0, 25).map((fixture: any) => ({
-        id: `apifb_${fixture.fixture.id}`,
-        homeTeam: fixture.teams.home.name,
-        awayTeam: fixture.teams.away.name,
-        score: `${fixture.goals.home ?? 0}-${fixture.goals.away ?? 0}`,
-        time: `${fixture.fixture.status.elapsed || 0}'`,
-        status: fixture.fixture.status.short === 'LIVE' ||
-                fixture.fixture.status.short === '1H' ||
-                fixture.fixture.status.short === '2H' ||
-                fixture.fixture.status.short === 'HT' ? 'live' : 'unknown',
-        league: fixture.league.name
-      }));
+        const matches: Match[] = data.response.slice(0, 25).map((fixture: any) => ({
+          id: `apifb_${fixture.fixture.id}`,
+          homeTeam: fixture.teams.home.name,
+          awayTeam: fixture.teams.away.name,
+          score: `${fixture.goals.home ?? 0}-${fixture.goals.away ?? 0}`,
+          time: `${fixture.fixture.status.elapsed || 0}'`,
+          status: fixture.fixture.status.short === 'LIVE' ||
+                  fixture.fixture.status.short === '1H' ||
+                  fixture.fixture.status.short === '2H' ||
+                  fixture.fixture.status.short === 'HT' ? 'live' : 'unknown',
+          league: fixture.league.name
+        }));
 
-      return matches;
+        return matches;
+      }
+    } catch (error) {
+      console.log('API-Football failed, trying Sofascore...');
     }
-  } catch (error) {
-    console.log('API-Football failed, trying Sofascore...');
+  } else {
+    console.log('No API-Football key, using Sofascore...');
   }
 
   // Fallback sur Sofascore via proxy
