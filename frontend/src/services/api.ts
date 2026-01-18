@@ -100,7 +100,7 @@ export const fetchLiveMatches = async (): Promise<Match[]> => {
       if (liveData?.response?.length > 0) {
         console.log(`API-Football: ${liveData.response.length} live matches`);
 
-        const matches: Match[] = liveData.response.slice(0, 25).map((fixture: any) => ({
+        const matches: Match[] = liveData.response.map((fixture: any) => ({
           id: `apifb_${fixture.fixture.id}`,
           homeTeam: fixture.teams.home.name,
           awayTeam: fixture.teams.away.name,
@@ -149,7 +149,8 @@ export const fetchLiveMatches = async (): Promise<Match[]> => {
 
         const sorted = [...live, ...upcoming.sort(sortByLeague), ...finished.sort(sortByLeague).reverse()];
 
-        const matches: Match[] = sorted.slice(0, 25).map((fixture: any) => {
+        // Afficher tous les matchs (max 500 pour performance)
+        const matches: Match[] = sorted.slice(0, 500).map((fixture: any) => {
           const status = fixture.fixture.status.short;
           let matchStatus: 'live' | 'scheduled' | 'finished' | 'unknown' = 'unknown';
           let timeDisplay = '';

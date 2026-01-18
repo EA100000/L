@@ -28,39 +28,21 @@ function App() {
     try {
       setIsRefreshing(true);
 
-      // Récupérer les matchs en direct
+      // Récupérer tous les matchs
       const matches = await fetchLiveMatches();
 
       if (matches.length > 0) {
         const newMatchesData = new Map<string, MatchData>();
 
-        // Pour chaque match, récupérer les stats et l'analyse
-        for (const match of matches.slice(0, 10)) {
+        // Ajouter tous les matchs sans charger les stats (trop de requêtes)
+        for (const match of matches) {
           newMatchesData.set(match.id, { match });
-
-          try {
-            // Récupérer les stats
-            const stats = await fetchMatchStats(match.id);
-
-            // Analyser avec TES
-            const timeElapsed = parseInt(String(match.time)) || 60;
-            const recommendations = analyzeMatch(stats, timeElapsed);
-
-            newMatchesData.set(match.id, {
-              match,
-              stats,
-              recommendations,
-              lastUpdate: new Date().toISOString(),
-            });
-          } catch (err) {
-            console.error(`Erreur stats/analysis pour match ${match.id}:`, err);
-          }
         }
 
         setMatchesData(newMatchesData);
 
         // Sélectionner le premier match par défaut
-        if (matches.length > 0 && !selectedMatchId) {
+        if (!selectedMatchId) {
           setSelectedMatchId(matches[0].id);
         }
 
@@ -73,6 +55,38 @@ function App() {
       setIsRefreshing(false);
     }
   }, [selectedMatchId]);
+
+  // Charger les stats quand on sélectionne un match
+  const loadMatchStats = useCallback(async (matchId: string) => {
+    const matchData = matchesData.get(matchId);
+    if (!matchData || matchData.stats) return; // Déjà chargé
+
+    try {
+      const stats = await fetchMatchStats(matchId);
+      const timeElapsed = parseInt(String(matchData.match.time)) || 60;
+      const recommendations = analyzeMatch(stats, timeElapsed);
+
+      setMatchesData(prev => {
+        const newMap = new Map(prev);
+        newMap.set(matchId, {
+          ...matchData,
+          stats,
+          recommendations,
+          lastUpdate: new Date().toISOString(),
+        });
+        return newMap;
+      });
+    } catch (err) {
+      console.error(`Erreur stats pour match ${matchId}:`, err);
+    }
+  }, [matchesData]);
+
+  // Charger les stats du match sélectionné
+  useEffect(() => {
+    if (selectedMatchId) {
+      loadMatchStats(selectedMatchId);
+    }
+  }, [selectedMatchId, loadMatchStats]);
 
   // Fetch initial et refresh automatique
   useEffect(() => {
