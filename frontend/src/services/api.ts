@@ -90,38 +90,17 @@ const SOFASCORE_API = 'https://api.sofascore.com/api/v1';
 export const fetchLiveMatches = async (): Promise<Match[]> => {
   const apiKey = getApiKey();
 
-  // Essayer API-Football d'abord (si clé configurée)
+  // Essayer API-Football (si clé configurée)
   if (apiKey) {
     try {
-      // D'abord essayer les matchs en direct
-      console.log('Fetching live matches from API-Football...');
-      const liveData = await fetchFromAPIFootball('/fixtures?live=all');
-
-      if (liveData?.response?.length > 0) {
-        console.log(`API-Football: ${liveData.response.length} live matches`);
-
-        const matches: Match[] = liveData.response.map((fixture: any) => ({
-          id: `apifb_${fixture.fixture.id}`,
-          homeTeam: fixture.teams.home.name,
-          awayTeam: fixture.teams.away.name,
-          score: `${fixture.goals.home ?? 0}-${fixture.goals.away ?? 0}`,
-          time: `${fixture.fixture.status.elapsed || 0}'`,
-          status: 'live' as const,
-          league: fixture.league.name
-        }));
-
-        return matches;
-      }
-
-      // Si pas de matchs en direct, chercher les matchs du jour
-      console.log('No live matches, fetching today\'s fixtures...');
+      // Toujours chercher les matchs du jour
+      console.log('Fetching today\'s fixtures from API-Football...');
       const today = new Date().toISOString().split('T')[0];
       const todayData = await fetchFromAPIFootball(`/fixtures?date=${today}`);
 
       if (todayData?.response?.length > 0) {
         console.log(`API-Football: ${todayData.response.length} fixtures today`);
 
-        // Filtrer et trier: en cours > à venir > terminés
         const fixtures = todayData.response;
 
         // Séparer par statut
@@ -135,22 +114,25 @@ export const fetchLiveMatches = async (): Promise<Match[]> => {
           ['FT', 'AET', 'PEN'].includes(f.fixture.status.short)
         );
 
-        // Prendre les plus importants (top leagues)
-        const topLeagues = [39, 140, 135, 78, 61, 2, 3, 848, 1]; // PL, La Liga, Serie A, Bundesliga, L1, UCL, UEL, Conf League, World Cup
+        // Si 25+ matchs en direct, afficher seulement les lives
+        if (live.length >= 25) {
+          console.log(`${live.length} live matches - showing only live`);
+          const matches: Match[] = live.map((fixture: any) => ({
+            id: `apifb_${fixture.fixture.id}`,
+            homeTeam: fixture.teams.home.name,
+            awayTeam: fixture.teams.away.name,
+            score: `${fixture.goals.home ?? 0}-${fixture.goals.away ?? 0}`,
+            time: fixture.fixture.status.short === 'HT' ? 'MT' : `${fixture.fixture.status.elapsed || 0}'`,
+            status: 'live' as const,
+            league: fixture.league.name
+          }));
+          return matches;
+        }
 
-        const sortByLeague = (a: any, b: any) => {
-          const aTop = topLeagues.indexOf(a.league.id);
-          const bTop = topLeagues.indexOf(b.league.id);
-          if (aTop !== -1 && bTop === -1) return -1;
-          if (aTop === -1 && bTop !== -1) return 1;
-          if (aTop !== -1 && bTop !== -1) return aTop - bTop;
-          return 0;
-        };
+        // Sinon, afficher tous les matchs du jour (live en premier)
+        const sorted = [...live, ...upcoming, ...finished];
 
-        const sorted = [...live, ...upcoming.sort(sortByLeague), ...finished.sort(sortByLeague).reverse()];
-
-        // Afficher tous les matchs (max 500 pour performance)
-        const matches: Match[] = sorted.slice(0, 500).map((fixture: any) => {
+        const matches: Match[] = sorted.map((fixture: any) => {
           const status = fixture.fixture.status.short;
           let matchStatus: 'live' | 'scheduled' | 'finished' | 'unknown' = 'unknown';
           let timeDisplay = '';
