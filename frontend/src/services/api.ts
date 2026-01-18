@@ -44,6 +44,11 @@ const fetchFromAPIFootball = async (endpoint: string): Promise<any> => {
 
     if (response.ok) {
       const data = await response.json();
+      // Vérifier si on a atteint la limite
+      if (data.errors?.requests) {
+        console.error('API limit reached:', data.errors.requests);
+        throw new Error('API limit reached');
+      }
       return data;
     }
     throw new Error('API-Football request failed');
