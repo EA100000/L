@@ -89,6 +89,99 @@ const fetchWithProxy = async (url: string): Promise<any> => {
 const SOFASCORE_API = 'https://api.sofascore.com/api/v1';
 
 // ==========================================
+// FLASHSCORE PARSER
+// ==========================================
+
+const parseFlashScoreData = (data: string): Match[] => {
+  const matches: Match[] = [];
+  const lines = data.split('~');
+
+  let currentLeague = '';
+
+  for (const line of lines) {
+    if (line.startsWith('ZA÷')) {
+      // Nouvelle league
+      currentLeague = line.split('¬')[0].replace('ZA÷', '');
+    }
+
+    if (line.startsWith('AA÷')) {
+      // Match data
+      const parts = line.split('¬');
+      const matchData: Record<string, string> = {};
+
+      for (const part of parts) {
+        const [key, value] = part.split('÷');
+        if (key && value) {
+          matchData[key] = value;
+        }
+      }
+
+      // AC = status (1=not started, 2=live, 3=finished)
+      // AE = home team, AF = away team
+      // AG = home score, AH = away score
+      // AB = match id
+
+      const status = matchData['AC'];
+      const homeTeam = matchData['AE'] || matchData['CX'] || 'Home';
+      const awayTeam = matchData['AF'] || 'Away';
+      const homeScore = matchData['AG'] || '0';
+      const awayScore = matchData['AH'] || '0';
+      const matchId = matchData['AA'] || '';
+      const elapsed = matchData['BK'] || matchData['BO'] || '';
+
+      let matchStatus: 'live' | 'scheduled' | 'finished' | 'unknown' = 'unknown';
+      let timeDisplay = '';
+
+      if (status === '2' || status === '3' && elapsed) {
+        matchStatus = 'live';
+        timeDisplay = elapsed ? `${elapsed}'` : 'LIVE';
+      } else if (status === '1') {
+        matchStatus = 'scheduled';
+        // AD = timestamp
+        if (matchData['AD']) {
+          const kickoff = new Date(parseInt(matchData['AD']) * 1000);
+          timeDisplay = kickoff.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+        }
+      } else if (status === '3') {
+        matchStatus = 'finished';
+        timeDisplay = 'Terminé';
+      }
+
+      if (homeTeam && awayTeam && matchId) {
+        matches.push({
+          id: `flash_${matchId}`,
+          homeTeam,
+          awayTeam,
+          score: `${homeScore}-${awayScore}`,
+          time: timeDisplay,
+          status: matchStatus,
+          league: currentLeague
+        });
+      }
+    }
+  }
+
+  return matches;
+};
+
+const fetchFromFlashScore = async (): Promise<Match[]> => {
+  try {
+    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent('https://www.flashscore.com/x/feed/f_1_0_3_en-gb_1')}`;
+    const response = await fetch(proxyUrl);
+
+    if (response.ok) {
+      const data = await response.json();
+      if (data.contents) {
+        return parseFlashScoreData(data.contents);
+      }
+    }
+  } catch (error) {
+    console.error('FlashScore error:', error);
+  }
+  return [];
+};
+
+// ==========================================
 // FETCH LIVE MATCHES - Multi-source
 // ==========================================
 
@@ -174,6 +267,19 @@ export const fetchLiveMatches = async (): Promise<Match[]> => {
     console.log('No API-Football key, using Sofascore...');
   }
 
+  // Fallback sur FlashScore
+  try {
+    console.log('Fetching from FlashScore...');
+    const flashMatches = await fetchFromFlashScore();
+
+    if (flashMatches.length > 0) {
+      console.log(`FlashScore: ${flashMatches.length} matches`);
+      return flashMatches;
+    }
+  } catch (error) {
+    console.error('FlashScore failed:', error);
+  }
+
   // Fallback sur Sofascore via proxy
   try {
     console.log('Fetching from Sofascore...');
@@ -182,7 +288,7 @@ export const fetchLiveMatches = async (): Promise<Match[]> => {
     if (data?.events?.length > 0) {
       console.log(`Sofascore: ${data.events.length} live events`);
 
-      const matches: Match[] = data.events.slice(0, 25).map((event: any) => ({
+      const matches: Match[] = data.events.map((event: any) => ({
         id: `sofascore_${event.id}`,
         homeTeam: event.homeTeam?.name || event.homeTeam?.shortName || 'Home',
         awayTeam: event.awayTeam?.name || event.awayTeam?.shortName || 'Away',
@@ -198,8 +304,8 @@ export const fetchLiveMatches = async (): Promise<Match[]> => {
     console.error('Sofascore also failed:', error);
   }
 
-  // Si aucun match en direct, retourner liste vide (pas de démo)
-  console.log('No live matches available from any source');
+  // Si aucun match, retourner liste vide
+  console.log('No matches available from any source');
   return [];
 };
 
