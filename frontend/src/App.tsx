@@ -64,7 +64,15 @@ function App() {
     try {
       const stats = await fetchMatchStats(matchId);
       const timeElapsed = parseInt(String(matchData.match.time)) || 60;
-      const recommendations = analyzeMatch(stats, timeElapsed);
+
+      // Parser le score pour le moteur TES
+      const scoreParts = matchData.match.score.split('-');
+      const currentScore = {
+        home: parseInt(scoreParts[0]) || 0,
+        away: parseInt(scoreParts[1]) || 0,
+      };
+
+      const recommendations = analyzeMatch(stats, timeElapsed, currentScore);
 
       setMatchesData(prev => {
         const newMap = new Map(prev);

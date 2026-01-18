@@ -1,4 +1,9 @@
 import { Match, MatchStats, BetRecommendation } from '../types';
+import { analyzeMatchAdvanced, getDefaultPreMatchData, PreMatchData } from './tes-engine';
+
+// Re-export pour compatibilité
+export { analyzeMatchAdvanced, getDefaultPreMatchData };
+export type { PreMatchData };
 
 // ==========================================
 // API-FOOTBALL - Données réelles
@@ -413,153 +418,14 @@ export const fetchMatchStats = async (matchId: string): Promise<MatchStats> => {
 };
 
 // ==========================================
-// MOTEUR TES (The Expert System)
+// MOTEUR TES - Wrapper pour compatibilité
 // ==========================================
 
-type Confidence = 'VERY_HIGH' | 'HIGH' | 'MEDIUM' | 'LOW' | 'VERY_LOW';
-
-const getConfidence = (probability: number): Confidence => {
-  if (probability >= 0.75) return 'VERY_HIGH';
-  if (probability >= 0.65) return 'HIGH';
-  if (probability >= 0.55) return 'MEDIUM';
-  if (probability >= 0.45) return 'LOW';
-  return 'VERY_LOW';
-};
-
-export const analyzeMatch = (stats: MatchStats, timeElapsed: number = 60): BetRecommendation[] => {
-  const recommendations: BetRecommendation[] = [];
-
-  // STRATÉGIE 1: CORNERS
-  if (timeElapsed >= 50) {
-    const totalCorners = stats.corners.home + stats.corners.away;
-    let probability = 0.60;
-    const reasoning: string[] = [];
-
-    if (totalCorners >= 7) {
-      reasoning.push(`✅ ${totalCorners} corners déjà (seuil: 7)`);
-      probability += 0.12;
-    }
-
-    const cornersPerMin = timeElapsed > 0 ? (totalCorners / timeElapsed) * 10 : 0;
-    if (cornersPerMin >= 1.3) {
-      reasoning.push(`✅ Rythme: ${cornersPerMin.toFixed(1)} corners/10min`);
-      probability += 0.08;
-    }
-
-    const totalShots = stats.shots.home + stats.shots.away;
-    if (totalShots >= 14) {
-      reasoning.push(`✅ Pression: ${totalShots} tirs`);
-      probability += 0.06;
-    }
-
-    if (reasoning.length > 0) {
-      recommendations.push({
-        bet_type: 'CORNER_HIGH_ACTIVITY',
-        description: 'Plus de corners attendus',
-        confidence: getConfidence(Math.min(probability, 0.88)),
-        probability: Math.round(Math.min(probability, 0.88) * 100),
-        reasoning,
-        threshold_reached: totalCorners >= 7
-      });
-    }
-  }
-
-  // STRATÉGIE 2: CARTONS
-  if (timeElapsed >= 55) {
-    const totalFouls = stats.fouls.home + stats.fouls.away;
-    const totalCards = stats.cards.yellow + stats.cards.red;
-    let probability = 0.55;
-    const reasoning: string[] = [];
-
-    if (totalFouls >= 18) {
-      reasoning.push(`✅ Match tendu: ${totalFouls} fautes`);
-      probability += 0.12;
-    }
-
-    if (totalCards >= 2) {
-      reasoning.push(`✅ Arbitre strict: ${totalCards} cartons`);
-      probability += 0.10;
-    }
-
-    if (reasoning.length > 0) {
-      recommendations.push({
-        bet_type: 'CARD_PREDICTION',
-        description: 'Carton probable',
-        confidence: getConfidence(Math.min(probability, 0.85)),
-        probability: Math.round(Math.min(probability, 0.85) * 100),
-        reasoning,
-        threshold_reached: totalFouls >= 18
-      });
-    }
-  }
-
-  // STRATÉGIE 3: BUT IMMINENT
-  if (timeElapsed >= 45) {
-    const totalShots = stats.shots.home + stats.shots.away;
-    const totalOnTarget = stats.shotsOnTarget.home + stats.shotsOnTarget.away;
-    let probability = 0.52;
-    const reasoning: string[] = [];
-
-    if (totalShots >= 12) {
-      reasoning.push(`✅ ${totalShots} tirs tentés`);
-      probability += 0.10;
-    }
-
-    if (totalOnTarget >= 5) {
-      reasoning.push(`✅ ${totalOnTarget} tirs cadrés`);
-      probability += 0.12;
-    }
-
-    const maxPoss = Math.max(stats.possession.home, stats.possession.away);
-    if (maxPoss >= 58) {
-      reasoning.push(`✅ Domination: ${maxPoss}%`);
-      probability += 0.06;
-    }
-
-    if (reasoning.length > 0) {
-      recommendations.push({
-        bet_type: 'GOAL_IMMINENT',
-        description: 'But probable bientôt',
-        confidence: getConfidence(Math.min(probability, 0.82)),
-        probability: Math.round(Math.min(probability, 0.82) * 100),
-        reasoning,
-        threshold_reached: totalOnTarget >= 5
-      });
-    }
-  }
-
-  // STRATÉGIE 4: BTTS
-  if (timeElapsed >= 35) {
-    const homeOnTarget = stats.shotsOnTarget.home;
-    const awayOnTarget = stats.shotsOnTarget.away;
-    let probability = 0.50;
-    const reasoning: string[] = [];
-
-    if (homeOnTarget >= 2 && awayOnTarget >= 2) {
-      reasoning.push(`✅ 2 équipes cadrent: ${homeOnTarget} vs ${awayOnTarget}`);
-      probability += 0.15;
-    }
-
-    const possDiff = Math.abs(stats.possession.home - stats.possession.away);
-    if (possDiff < 12) {
-      reasoning.push(`✅ Match équilibré`);
-      probability += 0.08;
-    }
-
-    if (reasoning.length > 0) {
-      recommendations.push({
-        bet_type: 'BOTH_TEAMS_SCORE',
-        description: 'Les 2 équipes vont marquer',
-        confidence: getConfidence(Math.min(probability, 0.78)),
-        probability: Math.round(Math.min(probability, 0.78) * 100),
-        reasoning,
-        threshold_reached: homeOnTarget >= 2 && awayOnTarget >= 2
-      });
-    }
-  }
-
-  // Trier par probabilité
-  recommendations.sort((a, b) => b.probability - a.probability);
-
-  return recommendations;
+export const analyzeMatch = (
+  stats: MatchStats,
+  timeElapsed: number = 60,
+  currentScore: { home: number; away: number } = { home: 0, away: 0 }
+): BetRecommendation[] => {
+  // Utiliser le moteur TES avancé
+  return analyzeMatchAdvanced(stats, timeElapsed, currentScore, getDefaultPreMatchData());
 };
